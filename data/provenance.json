@@ -1,0 +1,39 @@
+{
+  "description": "Fingerprints compare every original educational value before and after extraction. Canonical JSON uses JSON.stringify in original property order. Supplemental registry records do not alter source objects.",
+  "sources": [
+    {
+      "filename": "Financial Management Study Companion.html",
+      "fileSha256": "abb37751118e7cec0289c176376b2321073f34345b227bd6fd242d28e0a479f2",
+      "canonicalContentSha256": "f975565c6f0a1d92b7901e4d4ec47091c1f284977d12dfd1e57e814823887c2c"
+    },
+    {
+      "filename": "FIN NOTEBOOK.html",
+      "fileSha256": "bd46ed0c99fb3dbb28bc10322d100a02d2b126846ff33a0c48b1b377d46255fd",
+      "canonicalContentSha256": "594a5599db41712fcee7c4e7004963513f17e5438f8fb1cfd89a8b69e55ebe9c"
+    }
+  ],
+  "counts": {
+    "chapters": 6,
+    "originalLearningObjectives": 42,
+    "supplementalObjectives": 2,
+    "concepts": 229,
+    "caseStudies": 15,
+    "companionQuizzes": 151,
+    "notebookSections": 36,
+    "workedHomework": 51,
+    "conceptHomework": 20,
+    "keyTermSets": 3,
+    "notebookCards": 162,
+    "notebookQuizzes": 54,
+    "slides": 95
+  },
+  "registryCounts": {
+    "learningObjectives": 44,
+    "notebooks": 36,
+    "homework": 74,
+    "quizzes": 205,
+    "flashcards": 391,
+    "formulas": 414,
+    "summaries": 124
+  }
+}
