@@ -7,33 +7,33 @@
       "canonicalContentSha256": "f975565c6f0a1d92b7901e4d4ec47091c1f284977d12dfd1e57e814823887c2c"
     },
     {
-      "filename": "FIN NOTEBOOK.html",
-      "fileSha256": "bd46ed0c99fb3dbb28bc10322d100a02d2b126846ff33a0c48b1b377d46255fd",
-      "canonicalContentSha256": "594a5599db41712fcee7c4e7004963513f17e5438f8fb1cfd89a8b69e55ebe9c"
+      "filename": "FIN 303 · Notebook Study Guide (Chapters 3–8).html",
+      "fileSha256": "33b0f29b14923d9f1a9e23f3c2062a1ab5dda85c2327f9e7c0a79a5cc35d0af9",
+      "canonicalContentSha256": "79c8441b3eb0ac9fbc4d0ab35f15ab5e0df42d2d2acb54672ae8c02b37d09524"
     }
   ],
   "counts": {
-    "chapters": 6,
+    "chapters": 8,
     "originalLearningObjectives": 42,
-    "supplementalObjectives": 2,
+    "supplementalObjectives": 22,
     "concepts": 229,
     "caseStudies": 15,
     "companionQuizzes": 151,
-    "notebookSections": 36,
-    "workedHomework": 51,
-    "conceptHomework": 20,
-    "keyTermSets": 3,
-    "notebookCards": 162,
-    "notebookQuizzes": 54,
-    "slides": 95
+    "notebookSections": 57,
+    "workedHomework": 71,
+    "conceptHomework": 39,
+    "keyTermSets": 4,
+    "notebookCards": 252,
+    "notebookQuizzes": 86,
+    "slides": 150
   },
   "registryCounts": {
-    "learningObjectives": 44,
-    "notebooks": 36,
-    "homework": 74,
-    "quizzes": 205,
-    "flashcards": 391,
-    "formulas": 414,
-    "summaries": 124
+    "learningObjectives": 64,
+    "notebooks": 57,
+    "homework": 114,
+    "quizzes": 237,
+    "flashcards": 481,
+    "formulas": 510,
+    "summaries": 126
   }
 }

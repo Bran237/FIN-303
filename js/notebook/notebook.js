@@ -7,8 +7,10 @@ export function installNotebook(ctx) {
       return;
     }
     const notes = {
-      ch5: 'Sections 5.1 to 5.7 match your textbook. Sections 5.8 to 5.12 follow your slides, so check their numbers against your table of contents.',
-      ch6: 'Sections 6.1, 6.7, and 6.8 are confirmed by your slides. The titles of 6.2 to 6.6 follow the standard edition, so check them against your table of contents.'
+      ch5: 'Section numbers follow the updated notebook. Topics combining multiple textbook objectives keep those references in their titles.',
+      ch6: 'Section numbers follow the updated notebook. Sections 6.6 to 6.9 include slide topics and source limitations, as marked below.',
+      ch7: 'Sections 7.1 to 7.13 follow the supplied notebook. Sinking funds are not on your exam, according to the supplied slides.',
+      ch8: 'Sections 8.1 to 8.7 follow the supplied notebook. Sections 8.4 to 8.7 use your professor’s slides, as marked in the source.'
     };
     let h = '<h2>' + ctx.ch.title + '</h2>';
     h += '<div class="nbactions"><button class="btn primary" type="button" data-act="print">Print notebook</button><button class="btn" type="button" data-act="expand">Show all solutions</button><button class="btn" type="button" data-act="collapse">Hide all solutions</button></div>';

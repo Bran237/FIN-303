@@ -80,4 +80,72 @@ test('corrupt primary falls back to legacy without silently overwriting unreadab
 test('legacy known status is normalized during both load and direct progress import', () => {
   const store = createStore({ storage: memory() }); store.importBackup('{"flashcardStatus":{"c":"known"}}'); assert.equal(store.state.companion.flashcardStatus.c, 'know');
 });
+test('Chapters 7 and 8 navigation and notebook activity survive storage and backup restoration', () => {
+  const storage = memory(), store = createStore({ storage });
+  store.state.notebook.done['ch7:7.1'] = true;
+  store.state.notebook.homeworkDone['ch8:p81'] = true;
+  store.state.notebook.flashcards.ch8 = { known: [0], seen: [0, 1] };
+  for (const id of ['ch7', 'ch8']) {
+    store.setNavigation(id, 'notebook');
+    assert.equal(createStore({ storage }).state.navigation.chapterId, id);
+    const restored = createStore({ storage: memory() });
+    restored.importBackup(store.exportBackup());
+    assert.deepEqual(restored.state, store.state);
+  }
+  const before = cloneState(store);
+  assert.throws(() => store.setNavigation('ch9', 'notebook'));
+  assert.deepEqual(store.state, before);
+});
+test('old studio maps migrate corrected section labels once without moving companion progress', () => {
+  const state = defaultState();
+  delete state.notebook.sectionNumberingVersion;
+  state.notebook.done = { 'ch5:5.9': true, 'ch5:5.10': false, 'ch5:5.11': true, 'ch5:5.12': true, 'ch6:6.2': true, 'ch6:6.3': false, 'ch6:6.4': true, 'ch6:6.5': false, 'ch6:6.6': true, 'ch6:6.7': false, 'ch6:6.8': true, 'ch3:3.1a': true };
+  state.notebook.homeworkDone = { 'ch5:st1@5.9': true, 'ch6:st1@6.8': true, 'ch6:p62': true };
+  state.notebook.review = { 'sec:ch5:5.10': true, 'sec:ch6:6.6': true, 'hw:ch6:st1@6.7': true, 'hw:ch6:p62': true };
+  state.notebook.examCheck = { 'ex:ch6:0': true };
+  state.notebook.flashcards.ch6 = { known: [1, 3], seen: [0, 1, 3] };
+  state.notebook.quizHistory = [{ id: 'quiz:notebook:ch6:0', chapterId: 'ch6', correct: true }];
+  state.companion.chapterFlow.ch6 = { termsOpened: [], sectionsViewed: ['6.2::0'] };
+  const storage = memory({ [STORAGE_KEY]: JSON.stringify(state), fin303_mig_sections_v2: '1' });
+  const store = createStore({ storage });
+  assert.deepEqual(store.state.notebook.done, { 'ch5:5.10': true, 'ch5:5.11': false, 'ch5:5.13': true, 'ch5:5.16': true, 'ch6:6.3': true, 'ch6:6.4': false, 'ch6:6.5': true, 'ch6:6.6': false, 'ch6:6.7': true, 'ch6:6.8': false, 'ch6:6.9': true, 'ch3:3.1a': true });
+  assert.deepEqual(store.state.notebook.homeworkDone, { 'ch5:st1@5.10': true, 'ch6:st1@6.9': true, 'ch6:p62': true });
+  assert.deepEqual(store.state.notebook.review, { 'sec:ch5:5.11': true, 'sec:ch6:6.7': true, 'hw:ch6:st1@6.8': true, 'hw:ch6:p62': true });
+  assert.deepEqual(store.state.companion.chapterFlow.ch6.sectionsViewed, ['6.2::0']);
+  for (const name of ['examCheck', 'flashcards', 'quizHistory']) assert.deepEqual(store.state.notebook[name], state.notebook[name]);
+  assert.equal(store.state.notebook.sectionNumberingVersion, 2);
+  store.save();
+  assert.deepEqual(createStore({ storage }).state, store.state);
+  const restored = createStore({ storage: memory() });
+  restored.importBackup(backup(state));
+  assert.deepEqual(restored.state, store.state);
+  restored.importBackup(restored.exportBackup());
+  assert.deepEqual(restored.state, store.state);
+});
+test('original Notebook migration marker distinguishes corrected legacy maps and leaves originals intact', () => {
+  for (const corrected of [false, true]) {
+    const storage = memory({
+      fin303_nb_done: '{"ch5:5.10":true,"ch6:6.7":true}',
+      fin303_hw_done: '{"ch6:st1@6.7":true}',
+      fin303_review: '{"sec:ch6:6.7":true}',
+      ...(corrected ? { fin303_mig_sections_v2: '1' } : {}),
+    });
+    const store = createStore({ storage });
+    assert.deepEqual(store.state.notebook.done, corrected ? { 'ch5:5.10': true, 'ch6:6.7': true } : { 'ch5:5.11': true, 'ch6:6.8': true });
+    assert.equal(store.state.notebook.homeworkDone[corrected ? 'ch6:st1@6.7' : 'ch6:st1@6.8'], true);
+    assert.equal(store.state.notebook.review[corrected ? 'sec:ch6:6.7' : 'sec:ch6:6.8'], true);
+    assert.equal(storage.getItem('fin303_nb_done'), '{"ch5:5.10":true,"ch6:6.7":true}');
+    store.save();
+    assert.deepEqual(createStore({ storage }).state, store.state);
+  }
+});
+test('renumbering validates old backups before mutation and rejects unsupported numbering atomically', () => {
+  const store = createStore({ storage: memory() });
+  store.state.notebook.done['ch6:6.3'] = true;
+  const before = cloneState(store);
+  for (const notebook of [{ done: { 'ch6:6.2': 'invalid' } }, { sectionNumberingVersion: 3 }, { sectionNumberingVersion: '2' }]) {
+    assert.throws(() => store.importBackup(backup({ notebook })));
+    assert.deepEqual(store.state, before);
+  }
+});
 function cloneState(store) { return JSON.parse(JSON.stringify(store.state)); }

@@ -35,7 +35,9 @@ Keep `assets`, `css`, `js`, and `data` beside `index.html`. All application asse
 
 Supplied summaries, lecture slides, homework cross-links, timestamped video links, exam-review checklists, printable notes, and the Notebook’s own card/quiz decks remain available through the section tools.
 
-Textbook content covers Chapters 1–6. Supplied Notebook content covers Chapters 3–6; Chapters 1–2 display a clear absence notice instead of invented notes. Notices about unavailable original material are retained. Original section labels remain unchanged even where the two sources number topics differently.
+The studio covers Chapters 1–8. The Companion supplies textbook prose and its study tools for Chapters 1–6; the uploaded Notebook supplies Chapters 3–8. Chapters 7–8 include bond valuation, risk and return, notes, worked homework, flashcards, quizzes, lecture slides, and exam reviews. For those chapters, Textbook opens the supplied chapter summary, Study opens the Notebook review, and Practice opens the Notebook cards. Chapters 1–2 retain a clear notice that no Notebook material was supplied.
+
+Search includes Companion concepts and Notebook topics, terms, and formulas. Notebook section labels follow the updated upload, including corrected Chapter 5–6 numbering. Notices about missing homework, textbook material, and video coverage are retained.
 
 ## Progress and backups
 
@@ -58,7 +60,7 @@ On its first run on the same browser origin, the Studio migrates these original 
 - `fin303_exam_check`
 - `fin303_theme`
 
-The new shared key is `fin303_mastery_studio_v1`. Original Companion `{content, progress}` JSON exports can restore their progress while preserving the new Notebook state and content. An HTML upload carries course content, not the browser’s separately saved completion data. Different domains and `file://` documents cannot automatically share browser storage. The original Notebook has no backup export, so its prior completion migrates automatically only on the same origin.
+The shared key is `fin303_mastery_studio_v1`. The update migrates older Studio storage and backups to the corrected Chapter 5–6 section numbering, keeping completion, solved key-term groups, and review flags attached to their original topics. Progress already migrated by the uploaded Notebook is recognized through its `fin303_mig_sections_v2` marker. Original Companion `{content, progress}` JSON exports can restore their progress while preserving the new Notebook state and content. An HTML upload carries course content, not the browser’s separately saved completion data. Different domains and `file://` documents cannot automatically share browser storage. The original Notebook has no backup export, so its prior completion migrates automatically only on the same origin.
 
 ## Project structure
 
@@ -98,7 +100,7 @@ On a machine with system Chromium, the browser runner can use `CHROMIUM_PATH` or
 
 ## Maintain the project
 
-Edit educational content in `data/course.js` or `data/notebook-source.js`. Keep identifier relationships and topic-numbering differences in `data/database.js`. For example, Notebook section `5.9` covers perpetuities and maps to canonical `lo5.10`; its printed source label stays `5.9`. Supplemental Notebook topics explicitly identify their origin rather than pretending missing textbook objectives exist.
+Edit educational content in `data/course.js` or `data/notebook-source.js`. Keep identifier relationships and topic-numbering differences in `data/database.js`. For example, Notebook section `5.10` covers perpetuities and maps to canonical `lo5.10`; section `5.8` covers both `lo5.8` and `lo5.9`. Supplemental Notebook topics explicitly identify their origin rather than pretending missing textbook objectives exist.
 
 Feature modules should use the shared database and store instead of creating separate chapter datasets or storage keys. Scoped DOM listeners and styles prevent controls in one section from handling another section’s events. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the module contracts and lifecycle.
 

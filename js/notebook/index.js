@@ -233,7 +233,7 @@ export function mountNotebookSuite(host, {
       panel.dataset.chapterId = chapterId;
     } else if (ctx.curTab === 'cards') ctx.fcRender();
     if (anchor) {
-      const note = DB.notebooks.find(item => item.chapterId === chapterId && item.learningObjectiveIds.includes(anchor));
+      const note = DB.notebooks.find(item => item.chapterId === chapterId && (item.id === anchor || item.learningObjectiveIds.includes(anchor)));
       const id = note && ctx.curTab === 'notebook' ? `nb-${chapterId}-${ctx.ch.notebook.findIndex(item => item.num === note.num)}` : anchor;
       const element = ctx.dom.getElementById(id);
       if (element) {

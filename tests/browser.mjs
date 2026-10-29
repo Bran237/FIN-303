@@ -57,6 +57,7 @@ try {
     return structuredClone(store.state);
   });
   const route = async (section, chapter = 'ch3', view = '') => {
+    if (!CONTENT.chapters[chapter] && !view) view = { textbook: 'summary', study: 'examreview', practice: 'cards' }[section] || '';
     const hash = `#/${section}/${chapter}${view ? `/${view}` : ''}`;
     if (await page.evaluate(value => location.hash === value, hash)) return;
     await page.evaluate(value => { location.hash = value; }, hash);
@@ -91,7 +92,7 @@ try {
     await page.locator('#modePanelDashboard h1').waitFor();
     assert.equal(await page.locator('#startup-error').isVisible(), false);
     assert.equal(await page.locator('#main-navigation [data-section]').count(), 6);
-    assert.equal(await page.locator('#chapter-select option').count(), 6);
+    assert.equal(await page.locator('#chapter-select option').count(), 8);
     assert.equal((await page.request.get(`${base}missing-module.js`)).status(), 404);
   });
 
@@ -113,7 +114,7 @@ try {
     await page.locator('#course-search').fill('');
   });
 
-  await step('All 36 Write This Down sections retain immediately related homework', async () => {
+  await step('All 57 Write This Down sections retain immediately related homework', async () => {
     let total = 0;
     for (const chapter of NOTEBOOK_CHAPTERS) {
       await route('notebook', chapter.id);
@@ -127,7 +128,7 @@ try {
       for (const ids of await notes.evaluateAll(elements => elements.map(element => element.dataset.loIds))) assert.ok(ids && ids.split(' ').every(id => DB.learningObjectives.some(lo => lo.id === id)));
       assert.match(await notes.first().innerText(), /Write this down/i);
     }
-    assert.equal(total, 36);
+    assert.equal(total, 57);
     for (const id of ['ch1', 'ch2']) { await route('notebook', id); assert.match(await page.locator('#p-notebook').innerText(), /No notebook|not supplied|not yet/i); }
   });
 
@@ -262,6 +263,83 @@ try {
     assert.equal(await page.locator('html').getAttribute('data-theme'), 'light');
     await page.locator('#theme-toggle').click();
     assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark');
+  });
+
+  await step('New chapters open supplied summaries, reviews, slides and video limitations', async () => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    for (const id of ['ch7', 'ch8']) {
+      const chapter = NOTEBOOK_CHAPTERS.find(c => c.id === id);
+      await route('textbook', id);
+      assert.equal(await page.locator('#companion-suite').isVisible(), false);
+      assert.ok((await page.locator('#p-summary').innerText()).length > 1000);
+      await route('study', id);
+      assert.match(await page.locator('#p-examreview h2').innerText(), new RegExp(chapter.title));
+      await page.locator('#p-examreview [data-exchk]').first().check();
+      await route('study', id, 'slides');
+      assert.equal(await page.locator('#p-slides .slide').count(), chapter.slides.length);
+      await route('study', id, 'video');
+      assert.match(await page.locator('#p-video').innerText(), new RegExp(`No Chapter ${id.slice(2)} coverage`));
+      await route('homework', id);
+      const solved = page.locator('#p-homework [data-hwdone]').first();
+      await solved.check();
+      const key = await solved.getAttribute('data-hwdone');
+      assert.equal((await state()).notebook.homeworkDone[key], true);
+      await route('notebook', id);
+      await page.locator('#p-notebook [data-nbdone]').first().check();
+      await page.locator('#p-notebook [data-flag]').first().click();
+      await page.locator('.objective-details').evaluate(element => { element.open = true; });
+      await page.locator('#objective-links button').first().click();
+      assert.equal(await page.locator('#p-notebook').isVisible(), true);
+      await page.reload({ waitUntil: 'networkidle' });
+      assert.equal(await page.locator('#chapter-select').inputValue(), id);
+      assert.equal(await page.locator('#p-notebook [data-nbdone]').first().isChecked(), true);
+    }
+  });
+
+  await step('New chapter flashcards and all 32 quiz questions save and export together', async () => {
+    const before = (await state()).notebook.quizHistory.length;
+    for (const id of ['ch7', 'ch8']) {
+      await route('practice', id);
+      await page.locator('#fcFlip').click();
+      assert.equal(await page.locator('#fcCard.back').count(), 1);
+      await page.locator('#fcGot').click();
+      assert.ok((await state()).notebook.flashcards[id].known.includes(0));
+      await route('practice', id, 'quiz');
+      const chapter = NOTEBOOK_CHAPTERS.find(c => c.id === id);
+      for (const question of chapter.quiz) {
+        await page.locator(`#p-quiz .opt[data-idx="${question.a}"]`).click();
+        assert.match(await page.locator('#p-quiz .fb').innerText(), /Correct/);
+        await page.locator('#qzNext').click();
+      }
+      assert.match(await page.locator('#p-quiz .score').innerText(), /16\s*\/\s*16/);
+    }
+    assert.equal((await state()).notebook.quizHistory.length - before, 32);
+    const saved = await state();
+    const raw = await page.evaluate(async () => (await import(new URL('js/core/store.js', document.baseURI))).store.exportBackup());
+    await importFile(raw);
+    assert.deepEqual(await state(), saved);
+    await page.reload({ waitUntil: 'networkidle' });
+    assert.equal(await page.locator('#chapter-select').inputValue(), 'ch8');
+    assert.deepEqual((await state()).notebook, saved.notebook);
+  });
+
+  await step('Notebook search reaches new bond topics and the course dashboard counts them', async () => {
+    await page.locator('#course-search').fill('bond');
+    const result = page.locator('#search-results [data-note][data-chapter="ch7"]').first();
+    await result.click();
+    assert.equal(await page.locator('#chapter-select').inputValue(), 'ch7');
+    assert.equal(await page.locator('#p-notebook .hl').count(), 1);
+    await route('dashboard', 'ch1');
+    assert.match(await page.locator('.shared-dashboard').innerText(), /\/57/);
+    assert.equal(await page.locator('.shared-dashboard [data-open-section="notebook"]').count(), 6);
+    await page.locator('.shared-dashboard [data-open-section="textbook"][data-chapter="ch8"]').click();
+    assert.equal(await page.locator('#p-summary').isVisible(), true);
+    await route('dashboard', 'ch7');
+    assert.equal(await page.locator('#p-dashboard').isVisible(), true);
+    assert.equal(await page.locator('#companion-suite').isVisible(), false);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await route('notebook', 'ch8');
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
   });
 
   assert.deepEqual(errors, [], 'Unexpected JavaScript page errors');

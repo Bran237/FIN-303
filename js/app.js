@@ -21,6 +21,13 @@ let current = {
   companion,
   notebook,
   messageTimer;
+// Notebook-only chapters use their supplied summaries, reviews and practice.
+// Keep the Companion source intact rather than inventing textbook content.
+function chapterTools(section, chapterId) {
+  if (CONTENT.chapters[chapterId]) return tools[section];
+  if (['textbook', 'study', 'practice'].includes(section)) return tools[section].filter(([view]) => view !== '');
+  return tools[section];
+}
 function notify(message, persist = false) {
   clearTimeout(messageTimer);
   $('#studio-message').textContent = message;
@@ -42,10 +49,12 @@ function readRoute() {
   });
   const saved = store.state.navigation;
   const name = sections.includes(section) ? section : sections.includes(saved.section) ? saved.section : 'dashboard';
+  const chapterId = DB.chapters[id] ? id : DB.chapters[saved.chapterId] ? saved.chapterId : 'ch1';
+  const available = chapterTools(name, chapterId);
   return {
     section: name,
-    chapterId: CONTENT.chapters[id] ? id : CONTENT.chapters[saved.chapterId] ? saved.chapterId : 'ch1',
-    view: tools[name].some(([key]) => key === view) ? view : ''
+    chapterId,
+    view: available.some(([key]) => key === view) ? view : available[0][0]
   };
 }
 function applyTheme() {
@@ -62,7 +71,7 @@ function status() {
       hwT: 0
     };
   const answered = s.companion.quizAttempts.length + s.notebook.quizHistory.length;
-  $('#chapter-progress').innerHTML = `<b>Chapter ${CONTENT.chapters[current.chapterId].number}</b><br>Notebook ${stat.secD}/${stat.secT} · Homework ${stat.hwD}/${stat.hwT}<br>${answered} course questions answered · ${s.companion.xp} XP`;
+  $('#chapter-progress').innerHTML = `<b>Chapter ${DB.chapters[current.chapterId].number}</b><br>Notebook ${stat.secD}/${stat.secT} · Homework ${stat.hwD}/${stat.hwT}<br>${answered} course questions answered · ${s.companion.xp} XP`;
   $('#storage-status').textContent = store.status.persistent ? 'Progress saved in this browser. Export a backup for another device.' : store.status.message || 'Browser storage is unavailable. Export a backup before leaving.';
 }
 function sidebar() {
@@ -74,7 +83,7 @@ function sidebar() {
   status();
 }
 function syncChapter(id) {
-  if (rendering || !CONTENT.chapters[id] || id === current.chapterId) return;
+  if (rendering || !DB.chapters[id] || id === current.chapterId) return;
   current.chapterId = id;
   store.setNavigation(id, current.section);
   history.replaceState(null, '', hash(current));
@@ -103,7 +112,7 @@ function notebookNavigate(section, id, anchor) {
 }
 function decorateDashboard(panel) {
   if (!notebook) return;
-  const stats = CONTENT.course.chapters.map(id => ({
+  const stats = DB.course.chapters.map(id => ({
     id,
     ...notebook.stats(id)
   }));
@@ -121,7 +130,7 @@ function decorateDashboard(panel) {
   const attempts = [...store.state.companion.quizAttempts, ...store.state.notebook.quizHistory];
   const block = document.createElement('section');
   block.className = 'shared-dashboard';
-  block.innerHTML = `<h2>Notebook, homework &amp; practice</h2><div class="shared-stats"><div class="shared-stat"><strong>${total.secD}/${total.secT}</strong>Notebook sections written</div><div class="shared-stat"><strong>${total.hwD}/${total.hwT}</strong>Related homework items solved</div><div class="shared-stat"><strong>${attempts.length ? Math.round(100 * attempts.filter(x => x.correct).length / attempts.length) + '%' : '—'}</strong>Accuracy across both practice collections</div></div><div class="grid grid-2">${stats.map(s => `<div class="card"><b>Chapter ${CONTENT.chapters[s.id].number}</b><p class="small-muted">${s.secT ? `Notebook ${s.secD}/${s.secT} · Homework ${s.hwD}/${s.hwT}` : 'Textbook and study tools available. No notebook source was supplied for this chapter.'}</p><button class="btn small" data-open-section="textbook" data-chapter="${s.id}">Read textbook</button>${s.secT ? `<button class="btn secondary small" data-open-section="notebook" data-chapter="${s.id}">Open notebook</button>` : ''}</div>`).join('')}</div>`;
+  block.innerHTML = `<h2>Notebook, homework &amp; practice</h2><div class="shared-stats"><div class="shared-stat"><strong>${total.secD}/${total.secT}</strong>Notebook sections written</div><div class="shared-stat"><strong>${total.hwD}/${total.hwT}</strong>Related homework items solved</div><div class="shared-stat"><strong>${attempts.length ? Math.round(100 * attempts.filter(x => x.correct).length / attempts.length) + '%' : '—'}</strong>Accuracy across both practice collections</div></div><div class="grid grid-2">${stats.map(s => `<div class="card"><b>Chapter ${DB.chapters[s.id].number}</b><p class="small-muted">${s.secT ? `Notebook ${s.secD}/${s.secT} · Homework ${s.hwD}/${s.hwT}` : 'Textbook and study tools available. No notebook source was supplied for this chapter.'}</p><button class="btn small" data-open-section="textbook" data-chapter="${s.id}">${CONTENT.chapters[s.id] ? 'Read textbook' : 'Read chapter summary'}</button>${s.secT ? `<button class="btn secondary small" data-open-section="notebook" data-chapter="${s.id}">Open notebook</button>` : ''}</div>`).join('')}</div>`;
   panel.append(block);
 }
 function closeMenu() {
@@ -135,9 +144,9 @@ function setMenuAccess() {
 function renderRoute(anchor) {
   rendering = true;
   try {
-    $('#module-tools').innerHTML = tools[current.section].map(([view, label]) => `<button data-view="${view}" aria-pressed="${view === current.view}">${label}</button>`).join('');
+    $('#module-tools').innerHTML = chapterTools(current.section, current.chapterId).map(([view, label]) => `<button data-view="${view}" aria-pressed="${view === current.view}">${label}</button>`).join('');
     sidebar();
-    const nb = ['notebook', 'homework'].includes(current.section) || ['summary', 'examreview', 'slides', 'video', 'cards', 'quiz'].includes(current.view);
+    const nb = (!CONTENT.chapters[current.chapterId] && current.section === 'dashboard' && !current.view) || ['notebook', 'homework'].includes(current.section) || ['summary', 'examreview', 'slides', 'video', 'cards', 'quiz'].includes(current.view);
     if (nb) {
       companion.hide();
       $('#notebook-suite').hidden = false;
@@ -146,7 +155,7 @@ function renderRoute(anchor) {
       $('#notebook-suite').hidden = true;
       companion.show(current.section, current.chapterId, current.view);
     }
-    document.title = `FIN 303 · ${current.section[0].toUpperCase() + current.section.slice(1)} · Chapter ${CONTENT.chapters[current.chapterId].number}`;
+    document.title = `FIN 303 · ${current.section[0].toUpperCase() + current.section.slice(1)} · Chapter ${DB.chapters[current.chapterId].number}`;
     closeMenu();
   } finally {
     rendering = false;
@@ -154,8 +163,9 @@ function renderRoute(anchor) {
 }
 function navigate(section, id = current.chapterId, view = '', anchor) {
   if (!sections.includes(section)) section = 'dashboard';
-  if (!CONTENT.chapters[id]) id = current.chapterId;
-  if (!tools[section].some(([key]) => key === (view || ''))) view = '';
+  if (!DB.chapters[id]) id = current.chapterId;
+  const available = chapterTools(section, id);
+  if (!available.some(([key]) => key === (view || ''))) view = available[0][0];
   current = {
     section,
     chapterId: id,
@@ -178,7 +188,7 @@ function exportBackup() {
   notify('Backup exported. It includes study, notebook, homework, and quiz progress.');
 }
 try {
-  $('#chapter-select').innerHTML = CONTENT.course.chapters.map(id => `<option value="${id}">Chapter ${CONTENT.chapters[id].number}: ${escapeHTML(CONTENT.chapters[id].title)}</option>`).join('');
+  $('#chapter-select').innerHTML = DB.course.chapters.map(id => `<option value="${id}">Chapter ${DB.chapters[id].number}: ${escapeHTML(DB.chapters[id].title)}</option>`).join('');
   notebook = mountNotebookSuite($('#notebook-suite'), {
     store,
     onNavigate: notebookNavigate,
@@ -223,11 +233,21 @@ try {
     if (b) navigate(b.dataset.openSection, b.dataset.chapter);
   });
   $('#course-search').addEventListener('input', e => {
-    const results = companion.search(e.target.value);
-    $('#search-results').innerHTML = results.map(x => `<button data-concept="${x.id}" data-chapter="${x.chapterId}">${escapeHTML(x.term)}<small>Chapter ${CONTENT.chapters[x.chapterId].number} · LO ${x.lo}</small></button>`).join('');
-    if (e.target.value.trim().length >= 2 && !results.length) $('#search-results').textContent = 'No matching concepts.';
+    const query = e.target.value.trim().toLowerCase();
+    const results = companion.search(query);
+    const notes = query.length < 2 ? [] : DB.notebooks.filter(note =>
+      [note.title, ...(note.terms || []).flat(), ...(note.formulas || [])]
+        .some(text => String(text).replace(/<[^>]*>/g, ' ').toLowerCase().includes(query))).slice(0, 12);
+    $('#search-results').innerHTML = results.map(x => `<button data-concept="${escapeHTML(x.id)}" data-chapter="${x.chapterId}">${escapeHTML(x.term)}<small>Chapter ${DB.chapters[x.chapterId].number} · LO ${x.lo}</small></button>`).join('') + notes.map(note => `<button data-note="${escapeHTML(note.id)}" data-chapter="${note.chapterId}">${escapeHTML(note.title)}<small>Notebook · Section ${escapeHTML(note.num)}</small></button>`).join('');
+    if (query.length >= 2 && !results.length && !notes.length) $('#search-results').textContent = 'No matching concepts or notebook topics.';
   });
   $('#search-results').addEventListener('click', e => {
+    const note = e.target.closest('[data-note]');
+    if (note) {
+      navigate('notebook', note.dataset.chapter, '', note.dataset.note);
+      $('#search-results').replaceChildren();
+      return;
+    }
     const b = e.target.closest('[data-concept]');
     if (b) {
       navigate('textbook', b.dataset.chapter);
@@ -259,7 +279,7 @@ try {
     applyTheme();
   });
   $('#settings-button').addEventListener('click', () => {
-    if ($('#companion-suite').hidden) navigate('dashboard');
+    if ($('#companion-suite').hidden) navigate('dashboard', current.chapterId, CONTENT.chapters[current.chapterId] ? '' : 'progress');
     companion.settings();
   });
   $('#export-backup').addEventListener('click', exportBackup);

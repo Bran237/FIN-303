@@ -5,6 +5,11 @@ export const SCHEMA_VERSION = 1;
 const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 const THEMES = new Set(['auto', 'light', 'dark']);
 const SECTIONS = new Set(['dashboard', 'textbook', 'notebook', 'homework', 'study', 'practice', 'progress']);
+const NOTEBOOK_NUMBERING_VERSION = 2;
+const NOTEBOOK_SECTION_RENUMBERING = {
+  ch5: { '5.9': '5.10', '5.10': '5.11', '5.11': '5.13', '5.12': '5.16' },
+  ch6: { '6.2': '6.3', '6.3': '6.4', '6.4': '6.5', '6.5': '6.6', '6.6': '6.7', '6.7': '6.8', '6.8': '6.9' },
+};
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const clone = value => JSON.parse(JSON.stringify(value));
 const assert = (condition, message) => { if (!condition) throw new Error(`Invalid backup: ${message}`); };
@@ -17,7 +22,7 @@ export function defaultState() {
       flashcardStatus: {}, srs: {}, highlights: [], examHistory: [], badges: [],
       settings: { dark: false }, weeklyGoal: null, lastReminderDate: null, chapterFlow: {},
     },
-    notebook: { done: {}, homeworkDone: {}, review: {}, examCheck: {}, flashcards: {}, quizHistory: [] },
+    notebook: { sectionNumberingVersion: NOTEBOOK_NUMBERING_VERSION, done: {}, homeworkDone: {}, review: {}, examCheck: {}, flashcards: {}, quizHistory: [] },
     settings: { theme: 'auto' }, navigation: { chapterId: 'ch1', section: 'dashboard' },
   };
 }
@@ -124,6 +129,8 @@ function normalizeState(input) {
   result.schemaVersion = SCHEMA_VERSION;
   result.companion = normalizeCompanion(result.companion);
   const notebook = result.notebook;
+  const numbering = input.notebook?.sectionNumberingVersion ?? 1;
+  assert(numbering === 1 || numbering === NOTEBOOK_NUMBERING_VERSION, 'unsupported notebook section numbering.');
   maps(notebook, ['done', 'homeworkDone', 'review', 'examCheck', 'flashcards'], 'notebook');
   arrays(notebook, ['quizHistory'], 'notebook');
   for (const key of ['done', 'homeworkDone', 'review', 'examCheck']) {
@@ -134,8 +141,22 @@ function normalizeState(input) {
     for (const key of ['known', 'seen']) if (key in saved) assert(Array.isArray(saved[key]) && saved[key].every(n => Number.isInteger(n) && n >= 0), 'notebook flashcard indexes must be nonnegative integers.');
   }
   validateAttempts(notebook.quizHistory, 'notebook quiz history');
+  if (numbering === 1) {
+    // Map all keys from the original snapshot so chained labels move only once.
+    for (const name of ['done', 'homeworkDone', 'review']) {
+      const remapped = {};
+      for (const [key, value] of Object.entries(notebook[name])) {
+        const match = /^(?:(sec|hw):)?(ch5|ch6):(st1@)?(\d+\.\d+)$/.exec(key);
+        const section = match && NOTEBOOK_SECTION_RENUMBERING[match[2]][match[4]];
+        const target = section ? `${match[1] ? match[1] + ':' : ''}${match[2]}:${match[3] || ''}${section}` : key;
+        remapped[target] = Boolean(remapped[target] || value);
+      }
+      notebook[name] = remapped;
+    }
+  }
+  notebook.sectionNumberingVersion = NOTEBOOK_NUMBERING_VERSION;
   assert(THEMES.has(result.settings.theme), 'unsupported theme.');
-  assert(/^ch[1-6]$/.test(result.navigation.chapterId), 'unsupported chapter.');
+  assert(/^ch[1-8]$/.test(result.navigation.chapterId), 'unsupported chapter.');
   assert(SECTIONS.has(result.navigation.section), 'unsupported section.');
   return result;
 }
@@ -171,6 +192,8 @@ export function createStore(options = {}) {
   const parseLegacy = key => { const raw = read(key); if (!raw) return null; try { const value = JSON.parse(raw); safeJson(value); return value; } catch { return null; } };
   function legacyState() {
     const fallback = defaultState();
+    // The uploaded Notebook already migrates its own maps when this key is set.
+    fallback.notebook.sectionNumberingVersion = read('fin303_mig_sections_v2') ? NOTEBOOK_NUMBERING_VERSION : 1;
     const progress = parseLegacy('finmgmt_progress');
     if (progress) { try { fallback.companion = normalizeCompanion(progress); } catch {} }
     for (const [legacy, key] of [['fin303_nb_done', 'done'], ['fin303_hw_done', 'homeworkDone'], ['fin303_review', 'review'], ['fin303_exam_check', 'examCheck']]) {
@@ -229,7 +252,7 @@ export function createStore(options = {}) {
     importBackup,
     reset() { replaceInPlace(state, defaultState()); save('reset'); return state; },
     setNavigation(chapterId, section) {
-      assert(/^ch[1-6]$/.test(chapterId) && SECTIONS.has(section), 'unsupported navigation.');
+      assert(/^ch[1-8]$/.test(chapterId) && SECTIONS.has(section), 'unsupported navigation.');
       state.navigation.chapterId = chapterId; state.navigation.section = section; save('navigation');
     },
     setTheme(theme) { assert(THEMES.has(theme), 'unsupported theme.'); state.settings.theme = theme; save('theme'); },

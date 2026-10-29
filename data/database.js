@@ -4,16 +4,24 @@ import { NOTEBOOK_CHAPTERS } from './notebook-source.js';
 export { COURSE_CONTENT as CONTENT, NOTEBOOK_CHAPTERS };
 
 const SOURCE_COMPANION = 'Financial Management Study Companion.html';
-const SOURCE_NOTEBOOK = 'FIN NOTEBOOK.html';
+const SOURCE_NOTEBOOK = 'FIN 303 · Notebook Study Guide (Chapters 3–8).html';
 const NOTEBOOK_OBJECTIVE_MAP = {
-  ch5: { '5.8': ['lo5.8', 'lo5.9'], '5.9': ['lo5.10'], '5.10': ['lo5.11'], '5.11': ['lo5.13', 'lo5.14'], '5.12': ['lo5.16'] },
-  ch6: { '6.2': ['lo6.2', 'lo6.3'], '6.3': ['lo6.3', 'lo6.4'], '6.4': ['lo6.5'], '6.5': ['lo6.5'], '6.6': ['lo6.5'], '6.7': ['lo6.7-notebook'], '6.8': ['lo6.8-notebook'] },
+  ch5: { '5.8': ['lo5.8', 'lo5.9'], '5.13': ['lo5.13', 'lo5.14'] },
+  ch6: { '6.6': ['lo6.5'], '6.7': ['lo6.5'], '6.8': ['lo6.7-notebook'], '6.9': ['lo6.8-notebook'] },
 };
-const supplementalObjectives = ['6.7', '6.8'].map(code => {
-  const note = NOTEBOOK_CHAPTERS.find(chapter => chapter.id === 'ch6').notebook.find(section => section.num === code);
-  return { id: `lo${code}-notebook`, code: `${code}-notebook`, chapterId: 'ch6', text: note.title, sections: [code], keyConcepts: [], supplemental: true,
+const notebookOnlyChapters = NOTEBOOK_CHAPTERS.filter(chapter => !COURSE_CONTENT.chapters[chapter.id]);
+const supplementalTopics = [
+  // Keep the existing canonical IDs as the uploaded Notebook corrects its labels.
+  ...['6.8', '6.9'].map((code, index) => ({ chapterId: 'ch6', code, id: `lo6.${index + 7}-notebook` })),
+  ...notebookOnlyChapters.flatMap(chapter => chapter.notebook.map(note => ({ chapterId: chapter.id, code: note.num, id: `lo${note.num}-notebook` }))),
+];
+const supplementalObjectives = supplementalTopics.map(({ chapterId, code, id }) => {
+  const note = NOTEBOOK_CHAPTERS.find(chapter => chapter.id === chapterId).notebook.find(section => section.num === code);
+  if (!NOTEBOOK_OBJECTIVE_MAP[chapterId]) NOTEBOOK_OBJECTIVE_MAP[chapterId] = {};
+  NOTEBOOK_OBJECTIVE_MAP[chapterId][code] = [id];
+  return { id, code: id.slice(2), chapterId, text: note.title, sections: [code], keyConcepts: [], supplemental: true,
     provenance: { source: SOURCE_NOTEBOOK, section: code, kind: 'supplemental-notebook-topic' },
-    mappingNote: 'This source notebook topic has no supplied companion objective. Its original label is preserved.' };
+    mappingNote: 'This supplied Notebook topic has no Companion objective. Its source label and provenance are preserved.' };
 });
 const learningObjectives = [...COURSE_CONTENT.learningObjectives, ...supplementalObjectives];
 const objectiveById = new Map(learningObjectives.map(objective => [objective.id, objective]));
@@ -23,7 +31,7 @@ const normalizeChapter = value => {
   return match ? `ch${Number(match[1])}` : String(raw ?? '');
 };
 
-export function chapterNumber(chapter) { return COURSE_CONTENT.chapters[normalizeChapter(chapter)]?.number ?? Number(String(chapter).replace(/^ch/, '')); }
+export function chapterNumber(chapter) { return chapters[normalizeChapter(chapter)]?.number ?? Number(normalizeChapter(chapter).replace(/^ch/, '')); }
 
 /** Numeric labels default to notebook numbering; explicit loX.Y is canonical. */
 export function learningObjectiveIds(chapter, section, source = 'notebook') {
@@ -50,7 +58,17 @@ const provenance = (source, path) => ({ source, path });
 const link = (ids, linkStatus = 'section') => ({ learningObjectiveIds: [...new Set(ids)], linkStatus: ids.length ? linkStatus : 'unmapped' });
 const parseHomework = value => String(value).split('|')[0];
 
-const chapters = Object.fromEntries(Object.entries(COURSE_CONTENT.chapters).map(([id, chapter]) => [id, {
+const course = { ...COURSE_CONTENT.course, chapters: [...COURSE_CONTENT.course.chapters, ...notebookOnlyChapters.map(chapter => chapter.id)] };
+const chapterSources = {
+  ...COURSE_CONTENT.chapters,
+  ...Object.fromEntries(notebookOnlyChapters.map(chapter => [chapter.id, {
+    id: chapter.id, number: Number(chapter.id.slice(2)), title: chapter.title.replace(/^Chapter \d+:\s*/, ''),
+    week: Number(chapter.id.slice(2)), courseId: course.id, sections: chapter.notebook.map(note => note.num),
+    learningObjectives: chapterObjectives(chapter.id), supplemental: true,
+    provenance: provenance(SOURCE_NOTEBOOK, chapter.id),
+  }])),
+};
+const chapters = Object.fromEntries(Object.entries(chapterSources).map(([id, chapter]) => [id, {
   ...chapter, learningObjectiveIds: chapterObjectives(id),
   notebookChapterId: NOTEBOOK_CHAPTERS.some(item => item.id === id) ? id : null,
 }]));
@@ -136,7 +154,7 @@ NOTEBOOK_CHAPTERS.forEach(chapter => {
 });
 
 export const DB = {
-  course: COURSE_CONTENT.course, chapters, learningObjectives, notebooks, homework,
+  course, chapters, learningObjectives, notebooks, homework,
   quizzes, flashcards, formulas, summaries, textbookSummaries: summaries,
   concepts: COURSE_CONTENT.concepts, caseStudies: COURSE_CONTENT.caseStudies,
   notebookObjectiveMap: NOTEBOOK_OBJECTIVE_MAP,
